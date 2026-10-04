@@ -1,0 +1,6 @@
+line_config.json
+status.json
+alerts.log
+venv/
+__pycache__/
+*.csv

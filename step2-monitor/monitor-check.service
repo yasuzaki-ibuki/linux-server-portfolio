@@ -1,0 +1,8 @@
+[Unit]
+Description=Server monitor check
+
+[Service]
+Type=oneshot
+User=yasu
+WorkingDirectory=/opt/monitor
+ExecStart=/opt/monitor/venv/bin/python3 /opt/monitor/check.py

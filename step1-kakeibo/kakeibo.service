@@ -1,0 +1,12 @@
+[Unit]
+Description=Kakeibo Flask app
+After=network.target
+
+[Service]
+User=yasu
+WorkingDirectory=/opt/kakeibo
+ExecStart=/opt/kakeibo/venv/bin/python3 -m gunicorn --bind 127.0.0.1:8000 app:app
+Restart=always
+
+[Install]
+WantedBy=multi-user.target

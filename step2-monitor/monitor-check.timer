@@ -1,0 +1,10 @@
+[Unit]
+Description=Run server monitor check every minute
+
+[Timer]
+OnBootSec=1min
+OnUnitActiveSec=1min
+Unit=monitor-check.service
+
+[Install]
+WantedBy=timers.target
