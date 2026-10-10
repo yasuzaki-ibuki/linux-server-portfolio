@@ -1,0 +1,69 @@
+{% extends "base.html" %}
+
+{% block title %}{% if mode == 'new' %}新規登録{% else %}No.{{ record_id }} 編集{% endif %}{% endblock %}
+
+{% block content %}
+{% if mode == 'new' %}
+<p><a href="{{ url_for('index') }}">← 一覧に戻る</a></p>
+<h2>新規登録</h2>
+{% else %}
+<p><a href="{{ url_for('detail', record_id=record_id) }}">← 詳細に戻る</a></p>
+<h2>No.{{ record_id }} 編集</h2>
+{% endif %}
+
+{% if errors %}
+<ul class="errors">
+  {% for e in errors %}
+  <li>{{ e }}</li>
+  {% endfor %}
+</ul>
+{% endif %}
+
+<form method="post" class="record-form">
+  <label>発生日時
+    <input type="datetime-local" name="occurred_at" value="{{ data.occurred_at|replace(' ', 'T') }}" required>
+  </label>
+
+  <label>種別
+    <select name="kind">
+      {% for k in kinds %}
+      <option value="{{ k }}" {% if k == data.kind %}selected{% endif %}>{{ k }}</option>
+      {% endfor %}
+    </select>
+  </label>
+
+  <label>ステータス
+    <select name="status">
+      {% for s in statuses %}
+      <option value="{{ s }}" {% if s == data.status %}selected{% endif %}>{{ s }}</option>
+      {% endfor %}
+    </select>
+  </label>
+
+  <label>タイトル
+    <input type="text" name="title" value="{{ data.title }}" maxlength="200" required>
+  </label>
+
+  <label>事象(何が起きたか)
+    <textarea name="event" rows="4">{{ data.event }}</textarea>
+  </label>
+
+  <label>影響
+    <textarea name="impact" rows="3">{{ data.impact }}</textarea>
+  </label>
+
+  <label>原因
+    <textarea name="cause" rows="4">{{ data.cause }}</textarea>
+  </label>
+
+  <label>対処
+    <textarea name="action" rows="4">{{ data.action }}</textarea>
+  </label>
+
+  <label>再発防止・今後
+    <textarea name="prevention" rows="4">{{ data.prevention }}</textarea>
+  </label>
+
+  <button type="submit">{% if mode == 'new' %}登録する{% else %}更新する{% endif %}</button>
+</form>
+{% endblock %}

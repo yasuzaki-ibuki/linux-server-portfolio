@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+
+{% block title %}No.{{ record.id }}{% endblock %}
+
+{% block content %}
+<p><a href="{{ url_for('index') }}">← 一覧に戻る</a> | <a href="{{ url_for('edit', record_id=record.id) }}">編集する</a></p>
+
+<h2>No.{{ record.id }} {{ record.title }}</h2>
+
+<dl>
+  <dt>発生日時</dt>
+  <dd>{{ record.occurred_at }}</dd>
+
+  <dt>種別</dt>
+  <dd>{{ record.kind }}</dd>
+
+  <dt>ステータス</dt>
+  <dd><span class="badge {% if record.status == '完了' %}status-done{% else %}status-open{% endif %}">{{ record.status }}</span></dd>
+
+  <dt>事象</dt>
+  <dd>{{ record.event or '(未記入)' }}</dd>
+
+  <dt>影響</dt>
+  <dd>{{ record.impact or '(未記入)' }}</dd>
+
+  <dt>原因</dt>
+  <dd>{{ record.cause or '(未記入)' }}</dd>
+
+  <dt>対処</dt>
+  <dd>{{ record.action or '(未記入)' }}</dd>
+
+  <dt>再発防止・今後</dt>
+  <dd>{{ record.prevention or '(未記入)' }}</dd>
+</dl>
+
+<p>登録:{{ record.created_at }} / 更新:{{ record.updated_at }}</p>
+{% endblock %}

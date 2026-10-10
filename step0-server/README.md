@@ -1,3 +1,15 @@
+# Step 0:サーバー構築
+
+VirtualBox上にRocky Linux 9(Minimal)を構築し、Webサーバーの土台を整えた。
+
+### 基本構築
+- 一般ユーザー(yasu)を作成し、wheelグループでsudoを許可
+- SSH公開鍵認証で接続(VirtualBoxのポートフォワーディング 127.0.0.1:2222→22)
+- ホスト名を rocky9-web に設定、dnfでパッチ適用
+- Nginxを導入し、firewalldでHTTPを許可
+- chronyで時刻同期(状態保存→再開に備えて makestep 1.0 -1 に変更)
+- SELinuxはEnforcingのまま運用
+- Nginxの設定:[nginx-kakeibo.conf](nginx-kakeibo.conf)(/ → 家計簿、/monitor/ → 監視、/worklog/ → 作業記録)
 
 ### SSHハードニング
 - パスワード認証・キーボード対話認証を無効化し、公開鍵認証のみに限定

@@ -14,7 +14,7 @@ STATUS_FILE = BASE_DIR / "status.json"
 ALERT_LOG = BASE_DIR / "alerts.log"
 
 # 見張るサービスの一覧
-SERVICES = ["nginx", "kakeibo", "sshd"]
+SERVICES = ["nginx", "kakeibo", "sshd", "worklog"]
 
 # これ以上になったら「異常」とみなす使用率(%)
 THRESHOLDS = {"cpu": 80, "memory": 80, "disk": 80}
