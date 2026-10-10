@@ -22,6 +22,7 @@
 | seed.py | 初期データ(これまでの障害5件)の登録 |
 | templates/ | 画面(共通部分・一覧・詳細・入力) |
 | worklog.service | systemdのサービス設定 |
+| requirements.txt | 必要なPythonパッケージの一覧 |
 
 ## 設計・運用で工夫した点
 
