@@ -1,6 +1,6 @@
 # Linux Server Portfolio
 
-VirtualBox上のRocky Linux 9に、Webサーバー・Webアプリ・監視の仕組みを構築した学習記録です。
+VirtualBox上のRocky Linux 9に、Webサーバー・Webアプリ・監視・データベースの仕組みを構築した学習記録です。
 Linuxサーバーの構築・運用・障害対応を、実際に手を動かして身につけることを目的にしています。
 
 ## 構成
@@ -13,9 +13,11 @@ Rocky Linux 9(VirtualBox)
    └─ Nginx(80番)
         ├─ /          → 家計簿アプリ(gunicorn 8000番)
         ├─ /monitor/  → 監視ダッシュボード(gunicorn 8001番)
-        └─ /worklog/  → 作業記録・障害報告アプリ(gunicorn 8002番)→ SQLite
+        ├─ /worklog/  → 作業記録・障害報告アプリ(gunicorn 8002番)→ SQLite
+        └─ /kintai/   → 勤怠・日報アプリ(gunicorn 8003番)→ PostgreSQL 18
 
    systemdタイマー(1分ごと)→ check.py → status.json / LINE通知
+   systemdタイマー(毎日3:00)→ backup.sh → pg_dump(7日分保持)
 ```
 
 ## 使用技術
@@ -23,8 +25,8 @@ Rocky Linux 9(VirtualBox)
 - OS:Rocky Linux 9.8(VirtualBox)
 - Webサーバー:Nginx(リバースプロキシ)
 - アプリ:Python 3.9 / Flask / gunicorn
-- データベース:SQLite
-- サービス管理:systemd(service / timer)
+- データベース:PostgreSQL 18、SQLite
+- サービス管理:systemd(service / timer、依存関係の設定)
 - セキュリティ:SSH公開鍵認証(パスワード認証・root直接ログイン禁止)、firewalld、SELinux(Enforcingのまま運用)
 - ログ:journald(永続化)
 - 時刻同期:chrony
@@ -57,6 +59,12 @@ Rocky Linux 9(VirtualBox)
 - これまでのサーバー構築で経験した障害5件を初期データとして登録
 - systemdでサービス化し、Nginxで /worklog/ に公開、監視の対象にも追加
 
+### Step 4:勤怠・日報アプリ(`step4-kintai/`)
+- PostgreSQL 18を導入し、打刻・日報・月次集計ができるWebアプリを構築
+- peer認証でパスワードを使わずに接続、DBは127.0.0.1のみで待ち受け
+- pg_dumpで毎日自動バックアップ(取得直後に検証、7日分保持)し、復元テストで実際に戻せることを確認
+- アプリとPostgreSQLの両方を監視し、停止試験で502と500の違いを切り分け
+
 ## つまずいたことと解決
 
 | 事象 | 原因 | 対応 |
@@ -67,9 +75,10 @@ Rocky Linux 9(VirtualBox)
 | 仮想マシンの時刻がずれる | 状態保存→再開で時計が止まり、chronyがゆっくり補正 | `chronyc makestep`で即時補正、`makestep 1.0 -1`に設定変更 |
 | 再起動テスト中にVirtualBoxが異常終了 | 仮想化基盤側の異常終了(Linuxの終了処理は正常完了) | VirtualBoxのログを保全し、`journalctl -b -1`で直前のログを確認して切り分け |
 | 新規登録画面でInternal Server Error | テンプレートファイルの配置ミス | gunicornのログ(Traceback)で`TemplateNotFound`を確認し、正しい場所に配置 |
+| 復元コマンドが無反応で止まる | `-d`のDB名を書き忘れ、pg_restoreが入力待ちになった | `Ctrl+C`で中断し、`-d kintai`を指定して再実行 |
 
 ## 今後の予定
 
-- Step 4:勤怠・日報アプリ(データベース、バックアップと復元)
 - Ansibleによる構築の自動化
 - AWS上への構築
+- バックアップの別の場所への保存
