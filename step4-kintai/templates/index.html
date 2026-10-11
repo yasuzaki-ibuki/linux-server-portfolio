@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+
+{% block content %}
+<section class="panel">
+  <p>{{ today.strftime('%Y年%m月%d日') }}</p>
+
+  <p class="status {% if status == '勤務中' %}status-working{% elif status == '退勤済み' %}status-done{% else %}status-none{% endif %}">
+    {{ status }}
+  </p>
+
+  {% if record and record.clock_in %}
+  <p>
+    出勤 {{ record.clock_in.strftime('%H:%M') }}
+    {% if record.clock_out %} / 退勤 {{ record.clock_out.strftime('%H:%M') }}{% endif %}
+  </p>
+  {% endif %}
+
+  <div class="buttons">
+    <form method="post" action="{{ url_for('clock_in') }}">
+      <button class="btn-in" type="submit" {% if status != '未出勤' %}disabled{% endif %}>出勤</button>
+    </form>
+    <form method="post" action="{{ url_for('clock_out') }}">
+      <button class="btn-out" type="submit" {% if status != '勤務中' %}disabled{% endif %}>退勤</button>
+    </form>
+  </div>
+</section>
+
+<h2>今月の勤怠(合計 {{ total }})</h2>
+<table>
+  <tr>
+    <th>日付</th>
+    <th>出勤</th>
+    <th>退勤</th>
+    <th>勤務時間</th>
+  </tr>
+  {% for r in rows %}
+  <tr>
+    <td>{{ r.work_date.strftime('%m/%d') }}</td>
+    <td>{{ r.clock_in.strftime('%H:%M') if r.clock_in else '' }}</td>
+    <td>{{ r.clock_out.strftime('%H:%M') if r.clock_out else '' }}</td>
+    <td>{{ r.worked }}</td>
+  </tr>
+  {% else %}
+  <tr><td colspan="4">今月の記録はまだありません</td></tr>
+  {% endfor %}
+</table>
+{% endblock %}

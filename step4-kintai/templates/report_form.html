@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+
+{% block title %}{{ d.strftime('%m/%d') }}の日報{% endblock %}
+
+{% block content %}
+<p><a href="{{ url_for('reports') }}">← 日報一覧に戻る</a></p>
+
+<h2>{{ d.strftime('%Y年%m月%d日') }}の日報</h2>
+
+<form method="post" class="report-form panel">
+  <label>やったこと
+    <textarea name="done" rows="5">{{ row.done if row and row.done else '' }}</textarea>
+  </label>
+
+  <label>課題・困ったこと
+    <textarea name="issues" rows="4">{{ row.issues if row and row.issues else '' }}</textarea>
+  </label>
+
+  <label>明日やること
+    <textarea name="plan" rows="4">{{ row.plan if row and row.plan else '' }}</textarea>
+  </label>
+
+  <button type="submit">保存する</button>
+</form>
+
+{% if row %}
+<p>最終更新:{{ row.updated_at.strftime('%Y-%m-%d %H:%M') }}</p>
+{% endif %}
+{% endblock %}

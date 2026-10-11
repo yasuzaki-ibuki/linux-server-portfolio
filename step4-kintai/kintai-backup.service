@@ -1,0 +1,10 @@
+[Unit]
+Description=Backup kintai database
+After=postgresql.service
+Requires=postgresql.service
+
+[Service]
+Type=oneshot
+User=yasu
+Group=yasu
+ExecStart=/opt/kintai/backup.sh

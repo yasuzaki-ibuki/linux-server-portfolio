@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+
+{% block title %}日報{% endblock %}
+
+{% block content %}
+<p><a class="button" href="{{ url_for('report_edit', report_date=today.isoformat()) }}">今日({{ today.strftime('%m/%d') }})の日報を書く</a></p>
+
+<h2>日報一覧</h2>
+<table>
+  <tr>
+    <th>日付</th>
+    <th>やったこと</th>
+    <th>課題</th>
+    <th>明日やること</th>
+  </tr>
+  {% for r in rows %}
+  <tr>
+    <td><a href="{{ url_for('report_edit', report_date=r.report_date.isoformat()) }}">{{ r.report_date.strftime('%m/%d') }}</a></td>
+    <td class="pre">{{ r.done or '' }}</td>
+    <td class="pre">{{ r.issues or '' }}</td>
+    <td class="pre">{{ r.plan or '' }}</td>
+  </tr>
+  {% else %}
+  <tr><td colspan="4">日報はまだありません</td></tr>
+  {% endfor %}
+</table>
+{% endblock %}

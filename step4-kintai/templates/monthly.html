@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+
+{% block title %}{{ first.strftime('%Y年%m月') }}の集計{% endblock %}
+
+{% block content %}
+<div class="month-nav">
+  <a href="{{ url_for('monthly', month=prev_month.strftime('%Y-%m')) }}">← {{ prev_month.strftime('%Y年%m月') }}</a>
+  <strong>{{ first.strftime('%Y年%m月') }}</strong>
+  <a href="{{ url_for('monthly', month=next_month.strftime('%Y-%m')) }}">{{ next_month.strftime('%Y年%m月') }} →</a>
+</div>
+
+<section class="panel summary">
+  <div>出勤日数:<strong>{{ days }}日</strong></div>
+  <div>合計:<strong>{{ total }}</strong></div>
+  <div>1日平均:<strong>{{ average }}</strong></div>
+  <div>日報:<strong>{{ report_count }}件</strong></div>
+</section>
+
+<table>
+  <tr>
+    <th>日付</th>
+    <th>出勤</th>
+    <th>退勤</th>
+    <th>勤務時間</th>
+    <th>日報</th>
+  </tr>
+  {% for r in rows %}
+  <tr class="{% if r.weekday == '土' %}sat{% elif r.weekday == '日' %}sun{% endif %}">
+    <td>{{ r.day.strftime('%m/%d') }}({{ r.weekday }})</td>
+    <td>{{ r.clock_in.strftime('%H:%M') if r.clock_in else '' }}</td>
+    <td>{{ r.clock_out.strftime('%H:%M') if r.clock_out else '' }}</td>
+    <td>{{ r.worked }}</td>
+    <td>
+      <a href="{{ url_for('report_edit', report_date=r.day.isoformat()) }}">{% if r.has_report %}○{% else %}書く{% endif %}</a>
+    </td>
+  </tr>
+  {% endfor %}
+</table>
+{% endblock %}
