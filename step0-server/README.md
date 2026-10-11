@@ -43,3 +43,9 @@ VirtualBox上にRocky Linux 9(Minimal)を構築し、Webサーバーの土台を
 - RETBleed(CPU脆弱性対策の警告):仮想環境特有のため対処不要
 - e1000(保守終了予定のNICドライバー):現状は動作。将来 virtio-net への変更を検討
 - vmwgfx(グラフィックドライバーの非対応警告):運用影響なし。VirtualBox異常終了の関連候補として記録し、再発時にグラフィックスコントローラーの変更を検討
+
+### 再起動テスト(2回目:2026-10-12)
+- PostgreSQL・作業記録・勤怠アプリ・バックアップタイマーを追加したため再実施
+- 9サービスすべてが自動起動(is-active:全 active、systemctl --failed:0件)
+- journalctl でPostgreSQLの起動完了後に勤怠アプリが起動したことを確認(After=postgresql.service が機能)
+- 前回発生したVirtualBoxの異常終了は再発せず
