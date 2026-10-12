@@ -3,7 +3,7 @@
 サーバーのネットワーク設定の確認・変更から、通信の観察、2台構成、ファイアウォールの見直しまでを行う。
 
 - A. NetworkManagerによるネットワーク設定の確認と変更
-- B. tcpdumpによる通信の観察(予定)
+- B. tcpdumpによる通信の観察
 - E. 仮想マシン2台構成(予定)
 - C. firewalldの見直し(予定)
 
@@ -62,3 +62,49 @@ sudo nmcli device reapply enp0s3
 
 - 反映には `nmcli device reapply` を使用(`connection up` と違い、接続を切らずに反映できるため、SSH接続中でも安全)
 - 変更前に切り戻し手順を用意し、変更 → 確認 → 切り戻しの流れで作業した
+
+
+
+## B. tcpdumpによる通信の観察
+
+### 観察① Nginx → アプリ(サーバー内部の通信)
+
+```bash
+sudo tcpdump -i lo -nn -A port 8003
+```
+
+- TCPの3ウェイハンドシェイク(`[S]` → `[S.]` → `[.]`)、データ送信(`[P.]`)、切断(`[F.]`)の流れを確認
+- Nginxからアプリへのリクエストに、設定した `proxy_set_header`(X-Real-IP、X-Forwarded-For など)が付与されていることを確認
+- HTTPは暗号化されていないため、リクエストやHTMLの中身がそのまま読めることを確認(Step 7でHTTPS化する理由)
+
+### 観察② 本体PCのブラウザ → Nginx
+
+```bash
+sudo tcpdump -i enp0s3 -nn port 80
+```
+
+- 本体PCのブラウザからのアクセスが、サーバーからは送信元 10.0.2.2(VirtualBoxの仮想ルーター)として見えることを確認
+- ポートフォワーディングでは、VirtualBoxがNAT(アドレス変換)をして転送していることを、実際のパケットで確認
+
+### 観察③ DNSの問い合わせ
+
+```bash
+sudo tcpdump -i enp0s3 -nn port 53
+```
+
+- 名前解決のときに、DNSサーバー(192.168.3.1)の53番(UDP)へ、A(IPv4)とAAAA(IPv6)の問い合わせが送られていることを確認
+- Aで確認した設定(/etc/resolv.conf)と、実際の通信が一致することを確認
+
+### キャプチャの保存
+
+```bash
+sudo tcpdump -i lo -nn -c 30 -w /tmp/kintai.pcap port 8003   # 30パケットでファイルに保存
+sudo tcpdump -nn -r /tmp/kintai.pcap                          # ファイルから読み込み
+```
+
+- キャプチャファイルには通信の中身が含まれるため、確認後に削除した
+
+### 学んだこと
+
+- 「設定を見る(ip / nmcli / resolv.conf)」と「通信を見る(tcpdump)」の両方で確かめることで、ネットワークの切り分けができる
+- 見張る出入り口(-i)とフィルター(port)を正しく選ぶことが大事。サーバー内部の通信は lo、外部との通信は enp0s3 を通る
