@@ -4,8 +4,8 @@
 
 - A. NetworkManagerによるネットワーク設定の確認と変更
 - B. tcpdumpによる通信の観察
-- E. 仮想マシン2台構成(予定)
-- C. firewalldの見直し(予定)
+- C. 仮想マシン2台構成(予定)
+- D. firewalldの見直し(予定)
 
 ## A. NetworkManagerによるネットワーク設定の確認と変更
 
