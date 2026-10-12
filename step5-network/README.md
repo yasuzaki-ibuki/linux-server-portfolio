@@ -4,7 +4,7 @@
 
 - A. NetworkManagerによるネットワーク設定の確認と変更
 - B. tcpdumpによる通信の観察
-- C. 仮想マシン2台構成(予定)
+- C. 仮想マシン2台構成
 - D. firewalldの見直し(予定)
 
 ## A. NetworkManagerによるネットワーク設定の確認と変更
@@ -108,3 +108,102 @@ sudo tcpdump -nn -r /tmp/kintai.pcap                          # ファイルか�
 
 - 「設定を見る(ip / nmcli / resolv.conf)」と「通信を見る(tcpdump)」の両方で確かめることで、ネットワークの切り分けができる
 - 見張る出入り口(-i)とフィルター(port)を正しく選ぶことが大事。サーバー内部の通信は lo、外部との通信は enp0s3 を通る
+
+
+## C. 仮想マシン2台構成
+
+### 構成
+
+```mermaid
+flowchart TB
+    PC["本体PC(Windows)<br>192.168.56.1"]
+    subgraph HO["ホストオンリーネットワーク 192.168.56.0/24"]
+        WEB["rocky9-web<br>enp0s8: 192.168.56.10"]
+        NODE["rocky9-node<br>enp0s8: 192.168.56.11"]
+    end
+    NAT["NAT(各VMのenp0s3: 10.0.2.15)<br>ゲートウェイ 10.0.2.2"]
+    NET["インターネット"]
+    PC --- HO
+    WEB -- "SSH(公開鍵認証)" --> NODE
+    WEB --> NAT
+    NODE --> NAT
+    NAT --> NET
+```
+
+| サーバー | アダプター1(NAT) | アダプター2(ホストオンリー) | 役割 |
+|---|---|---|---|
+| rocky9-web | 10.0.2.15(DHCP) | 192.168.56.10/24(固定) | 既存のWebサーバー。Step 6でAnsibleの命令を出す側 |
+| rocky9-node | 10.0.2.15(DHCP) | 192.168.56.11/24(固定) | Minimalで新規構築。Step 6でAnsibleにより構築される側 |
+
+### 設計のポイント
+
+- 各VMにNICを2枚持たせ、インターネットへの出口(NAT)とVM同士・本体PCとの通信(ホストオンリー)を分離
+- NATの中のVMは互いに直接通信できないため、VM間の通信用にホストオンリーネットワークを追加
+- ホストオンリー側にはゲートウェイを設定しない(デフォルトルートを1つに保ち、インターネット行きの通信がNAT側から出るようにするため)
+- 固定IPは、ホストオンリーのDHCPが配布する範囲(.101〜)と重ならないアドレスを選択
+- 2台ともNAT側のIPが同じ10.0.2.15になるが、NATはVMごとに独立しているため衝突しない
+
+### 実施内容
+
+**rocky9-web:2枚目のNICを追加し、固定IPを設定**
+
+```bash
+sudo nmcli connection add type ethernet ifname enp0s8 con-name hostonly \
+  ipv4.method manual ipv4.addresses 192.168.56.10/24 ipv6.method disabled
+sudo nmcli connection delete "有線接続 1"   # 自動で作られたDHCPの設定を削除
+sudo nmcli connection up hostonly
+```
+
+**rocky9-node:Rocky Linux 9 Minimalを新規インストール**
+
+- インストーラーでNIC2枚を設定し、enp0s8を固定IP(192.168.56.11/24、ゲートウェイなし、IPv6無効)に設定
+- rootアカウントは無効化し、管理者権限を持つ一般ユーザー(yasu)で運用
+- インストール後に `nmcli` で、インストーラーの設定がrocky9-webと同じ内容(manual・ゲートウェイなし)になっていることを確認
+
+**名前解決(/etc/hosts)**
+
+```
+192.168.56.10   rocky9-web
+192.168.56.11   rocky9-node
+```
+
+- 自宅のDNSはVMの名前を知らないため、両方のサーバーの /etc/hosts に登録
+
+**rocky9-web → rocky9-node のSSH鍵認証**
+
+```bash
+ssh-keygen -t ed25519 -f ~/.ssh/id_ed25519_node -C "rocky9-web to rocky9-node"
+ssh-copy-id -i ~/.ssh/id_ed25519_node.pub yasu@rocky9-node
+```
+
+~/.ssh/config(権限600):
+
+```
+Host rocky9-node
+    HostName 192.168.56.11
+    User yasu
+    IdentityFile ~/.ssh/id_ed25519_node
+```
+
+- GitHub用の鍵とは別に、rocky9-node用の鍵を作成(用途ごとに鍵を分け、漏えい時の影響範囲を限定)
+- Ansibleでの自動実行を想定し、学習環境のためパスフレーズなしとした(本番ではパスフレーズ+ssh-agentを使用する)
+
+### 動作確認
+
+| 確認内容 | コマンド | 結果 |
+|---|---|---|
+| VM間の疎通 | `ping -c 3 192.168.56.11` / `ping -c 3 192.168.56.10` | 双方向で0% packet loss |
+| 名前解決 | `getent hosts rocky9-node` | 192.168.56.11 |
+| 本体PCから直接接続 | `ssh yasu@192.168.56.11` | ポートフォワーディングなしで接続 |
+| 鍵認証でのコマンド実行 | `ssh rocky9-node hostname` | パスワードなしで `rocky9-node` が返る |
+
+### 構築中に発生したトラブル
+
+- 事象:`ssh rocky9-node` でパスワードを求められ、`no such identity: ~/.ssh/id_ed25519_nodeO` と表示された
+- 原因:~/.ssh/config の鍵のファイル名の末尾に、余計な文字(O)が入っていた
+- 対処:エラーメッセージのファイル名から打ち間違いに気づき、設定を修正
+- 学び:鍵認証のはずなのにパスワードを聞かれたら、鍵が使われていないサイン。エラーメッセージのファイル名を確認する
+
+### 気づき
+
+- 新規サーバーでは、nano・bash-completionのインストール、パッチ適用、/etc/hostsの設定などを、rocky9-webと同じように手作業で繰り返す必要があった。この繰り返しを自動化するのがStep 6(Ansible)
