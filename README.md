@@ -6,18 +6,31 @@ Linuxサーバーの構築・運用・障害対応を、実際に手を動かし
 ## 構成
 
 ```
-Windows(ブラウザ / PowerShell)
-   │  SSH(2222→22)/ HTTP(8080→80)
-   ▼
-Rocky Linux 9(VirtualBox)
+Windows(本体PC:ブラウザ / PowerShell)
+ │
+ ├─ NAT(ポートフォワーディング)
+ │    SSH 127.0.0.1:2222 → 22 / HTTP 127.0.0.1:8080 → 80
+ │    └→ rocky9-web の enp0s3
+ │
+ └─ ホストオンリーネットワーク 192.168.56.0/24(本体PC:192.168.56.1)
+      ├→ rocky9-web  の enp0s8:192.168.56.10
+      └→ rocky9-node の enp0s8:192.168.56.11
+
+rocky9-web(Rocky Linux 9)
    └─ Nginx(80番)
         ├─ /          → 家計簿アプリ(gunicorn 8000番)
         ├─ /monitor/  → 監視ダッシュボード(gunicorn 8001番)
         ├─ /worklog/  → 作業記録・障害報告アプリ(gunicorn 8002番)→ SQLite
         └─ /kintai/   → 勤怠・日報アプリ(gunicorn 8003番)→ PostgreSQL 18
-
    systemdタイマー(1分ごと)→ check.py → status.json / LINE通知
    systemdタイマー(毎日3:00)→ backup.sh → pg_dump(7日分保持)
+   firewalld:NAT側 ssh・http / ホストオンリー側 本体PCからのSSH・HTTPのみ
+
+rocky9-node(Rocky Linux 9 Minimal)
+   ・Ansibleで構築される側(予定)。rocky9-webからSSH鍵で接続
+   firewalld:ホストオンリー側 rocky9-web・本体PCからのSSHのみ
+
+インターネットへの出口:各VMの enp0s3(NAT → ゲートウェイ 10.0.2.2)
 ```
 
 ## 使用技術
