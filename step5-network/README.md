@@ -5,7 +5,7 @@
 - A. NetworkManagerによるネットワーク設定の確認と変更
 - B. tcpdumpによる通信の観察
 - C. 仮想マシン2台構成
-- D. firewalldの見直し(予定)
+- D. firewalldの見直し
 
 ## A. NetworkManagerによるネットワーク設定の確認と変更
 
@@ -207,3 +207,88 @@ Host rocky9-node
 ### 気づき
 
 - 新規サーバーでは、nano・bash-completionのインストール、パッチ適用、/etc/hostsの設定などを、rocky9-webと同じように手作業で繰り返す必要があった。この繰り返しを自動化するのがStep 6(Ansible)
+
+## D. firewalldの見直し
+
+### 棚卸し
+
+2台とも、変更前の状態を確認した。
+
+| 確認項目 | rocky9-web | rocky9-node |
+|---|---|---|
+| ゾーン | publicに enp0s3・enp0s8 の両方 | publicに enp0s3・enp0s8 の両方 |
+| 許可サービス | cockpit, dhcpv6-client, http, ssh | cockpit, dhcpv6-client, ssh |
+| 実際の待ち受け(ss -tlnp) | 22・80番は全アドレス、アプリ(8000〜8003)とDB(5432)は127.0.0.1のみ | 22番のみ |
+
+見つかった問題:
+
+- NAT側とホストオンリー側が同じゾーンで、送り元ごとに区別できない
+- cockpit(9090番)が許可されているのに、待ち受けているプログラムがない(使っていない入り口が開いている)
+
+アプリとDBは127.0.0.1でしか待ち受けていないため、firewalldの設定を誤っても外部からは届かない(多層防御)。
+
+### 設計
+
+| サーバー | NAT側(enp0s3:public) | ホストオンリー側(enp0s8:hostonly) |
+|---|---|---|
+| rocky9-web | ssh・http(ポートフォワーディングで使用)、cockpitは削除 | 本体PC(192.168.56.1)からのSSH・HTTPのみ許可 |
+| rocky9-node | 入ってくる通信がないため ssh・cockpit を削除 | rocky9-web(192.168.56.10)と本体PCからのSSHのみ許可 |
+
+- Ansibleは rocky9-web → rocky9-node の向きで使うため、rocky9-node → rocky9-web の通信は許可しない
+- 送り元まで指定するため、サービス単位の許可ではなくリッチルールを使用
+
+### 実施内容(rocky9-nodeの例)
+
+```bash
+# ゾーン作成(作成後は --reload しないとルールを追加できない)
+sudo firewall-cmd --permanent --new-zone=hostonly
+sudo firewall-cmd --reload
+
+# 送り元を限定してSSHを許可
+sudo firewall-cmd --permanent --zone=hostonly --add-rich-rule='rule family="ipv4" source address="192.168.56.10" service name="ssh" accept'
+sudo firewall-cmd --permanent --zone=hostonly --add-rich-rule='rule family="ipv4" source address="192.168.56.1" service name="ssh" accept'
+sudo firewall-cmd --reload
+
+# NICとゾーンの対応をNetworkManagerに保存(再起動後も維持)
+sudo nmcli connection modify enp0s8 connection.zone hostonly
+sudo nmcli device reapply enp0s8
+
+# NAT側の不要な許可を削除
+sudo firewall-cmd --permanent --zone=public --remove-service=ssh --remove-service=cockpit
+sudo firewall-cmd --reload
+```
+
+- rocky9-webも同様の手順。ただし、NetworkManagerの設定名が「hostonly」のため、`nmcli connection modify hostonly connection.zone hostonly` とした(1つ目は設定名、2つ目はゾーン名)
+- SSHのルールを変更するため、作業中はNAT経由の接続を残し、VirtualBoxのコンソールを最後の入り口として確保した
+
+### 試験
+
+| 試験 | 結果 | 意味 |
+|---|---|---|
+| 本体PC → rocky9-web(SSH・HTTP、ホストオンリー経由) | 接続できる | 許可した送り元は通る |
+| 本体PC → rocky9-web(SSH・HTTP、NAT経由) | 接続できる | NAT側の設定も維持 |
+| rocky9-node → rocky9-web(HTTP・SSH) | 「ホストへの経路がありません」 | 許可していない送り元は拒否 |
+| rocky9-web → rocky9-node(SSH) | 接続できる | Ansibleで使う向きは通る |
+| rocky9-web → rocky9-node:8080(試験用Webサーバー) | 「ホストへの経路がありません」 | 許可していないポートは拒否 |
+
+- rocky9-webは .11 からの通信を拒否しているが、web → node のSSHの返事は届いた。firewalldは自分から始めた通信の返事を自動で通す(ステートフル)ため、ルールは「新しく始まる通信」だけを考えればよい
+
+### エラーメッセージの見分け方
+
+| 表示 | 意味 |
+|---|---|
+| ホストへの経路がありません(No route to host) | 相手のファイアウォールが拒否した(経路がないわけではない) |
+| 接続を拒否されました(Connection refused) | ファイアウォールは通ったが、そのポートで待ち受けているプログラムがない |
+| タイムアウト | 返事がない(途中で捨てられている、相手が止まっているなど) |
+
+### 構築中に発生したトラブル
+
+- `-add-rich-rule`(ハイフン1つ)と打ち、オプションが認識されなかった → 長い名前のオプションはハイフン2つ
+- `firewall-cmd --zone=` のあとTab補完すると権限エラーが表示された → 補完の裏の問い合わせはsudoなしで実行されるため。ゾーン名は補完せず最後まで入力する
+- 削除したはずのcockpitが一覧に残っていた → `--permanent` の変更は `--reload` するまで反映されない。`--permanent --list-services` と見比べて確認
+
+### 学んだこと
+
+- 変更前に状態を確認し(棚卸し)、変更後に同じコマンドで確認する
+- 「許可した通信が通る」だけでなく「許可していない通信が止まる」ことも試験する
+- firewalldの設定は「今の設定」と「永続設定」の2つがあり、表示が違うときは --reload を忘れている
