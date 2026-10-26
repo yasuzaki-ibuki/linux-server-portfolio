@@ -21,6 +21,7 @@ Webアプリは「運用する対象」として用意し、監視・障害対�
 | 内容 | 場所 |
 |---|---|
 | 障害の切り分けと対処(502エラー、サービス起動失敗、VirtualBox異常終了など) | 下の「つまずいたことと解決」、各StepのREADME |
+| 障害時の対応手順書(Runbook) | `runbook/` |
 | 監視とLINE通知、停止試験 | Step 2・3・4 |
 | バックアップの自動化と復元テスト | Step 4 |
 | ネットワーク設定、パケットキャプチャ、ファイアウォール設計と拒否の試験 | Step 5 |
@@ -64,6 +65,7 @@ rocky9-node(Rocky Linux 9 Minimal)
 - データベース:PostgreSQL 18、SQLite
 - サービス管理:systemd(service / timer、依存関係の設定)
 - セキュリティ:SSH公開鍵認証(パスワード認証・root直接ログイン禁止)、firewalld、SELinux(Enforcingのまま運用)
+- ネットワーク:NetworkManager(nmcli)、tcpdump
 - ログ:journald(永続化)
 - 時刻同期:chrony
 - 通知:LINE Messaging API
@@ -107,6 +109,11 @@ rocky9-node(Rocky Linux 9 Minimal)
 - 仮想マシンを2台構成にし、ホストオンリーネットワークで通信。SSH鍵でサーバー間を接続
 - firewalldのゾーンとリッチルールで、NICごと・送り元ごとに受け付ける通信を設計し、拒否されることまで試験
 
+### Runbook(運用手順書)(`runbook/`)
+- 障害や定常作業が発生したときに、誰が対応しても同じ手順で確認・対処できるようにまとめた手順書
+- 構築中に実際に発生した障害と、その対応の経験をもとに作成
+- 01:Web画面が開かない(502・500の切り分け、ログの場所、SELinuxの確認)
+
 ## つまずいたことと解決
 
 | 事象 | 原因 | 対応 |
@@ -121,10 +128,11 @@ rocky9-node(Rocky Linux 9 Minimal)
 
 ## 今後の予定
 
-- 運用手順書(Runbook)の作成
+- Runbookの拡充(サービスが起動しない、バックアップからの復元、再起動作業、ファイアウォールの設定変更など)
 - 運用の基本(ログローテーション、ディスク容量逼迫時の対応、ユーザー・権限管理)
 - DNS(BIND)・DHCPサーバーの構築
 - Zabbixの導入と、自作監視からの移行
 - プロキシ(Squid)の構築
 - Ansibleによる構築の自動化
 - NginxのHTTPS化
+- 脆弱性診断ツールを使った、自分のサーバーのセキュリティ確認
